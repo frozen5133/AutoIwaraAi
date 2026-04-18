@@ -30,6 +30,26 @@ pip install requests beautifulsoup4 selenium webdriver-manager
 - iwara.aiのコンテンツは成人向けです。適切な使用をお願いします。
 - ダウンロードは著作権に注意してください。
 
+## プレイリスト生成
+
+ダウンロード履歴ファイルからプレイリスト（mpcpl/xspf）を生成できます。
+
+### 方法1: iwara_download.py から実行
+
+```bash
+python iwara_download.py --playlist-from-history R:\iwara.ai\download_history.txt
+```
+
+### 方法2: playlist.py を直接実行
+
+```bash
+python playlist.py --from-history R:\iwara.ai\download_history.txt
+```
+
+出力は履歴ファイルと同じディレクトリに生成されます：
+- `history_YYYYMMDDHHMMSS.mpcpl`（Media Player Classic用）
+- `history_YYYYMMDDHHMMSS.xspf`（VLC等用）
+
 ## コード例
 
 ```python
