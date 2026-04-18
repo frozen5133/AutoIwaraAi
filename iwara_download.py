@@ -8,6 +8,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 import time
+from datetime import datetime
 
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 DOWNLOAD_DELAY = 10  # ダウンロード間隔（秒）
@@ -179,6 +180,45 @@ def append_failure_url(video_url: str) -> None:
         print(f"失敗URLの記録に失敗しました: {e}")
 
 
+def generate_playlist_files(output_dir: str, video_files: list[str]) -> None:
+    """ダウンロードした動画からmpcplとxspf形式のプレイリストファイルを生成"""
+    if not video_files:
+        return
+
+    # 年月日時分秒でファイル名生成
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    base_name = timestamp
+
+    # MPCPL形式（Media Player Classic用）
+    mpcpl_path = os.path.join(output_dir, f"{base_name}.mpcpl")
+    try:
+        with open(mpcpl_path, 'w', encoding='utf-8') as f:
+            f.write("MPCPLAYLIST\n")
+            for i, video_file in enumerate(video_files, 1):
+                f.write(f"{i}|{video_file}\n")
+        print(f"MPCPLプレイリストを生成しました: {mpcpl_path}")
+    except Exception as e:
+        print(f"MPCPLプレイリストの生成に失敗しました: {e}")
+
+    # XSPF形式（VLC等用）
+    xspf_path = os.path.join(output_dir, f"{base_name}.xspf")
+    try:
+        with open(xspf_path, 'w', encoding='utf-8') as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+            f.write('<playlist version="1" xmlns="http://xspf.org/ns/0/">\n')
+            f.write('  <title>Downloaded Videos</title>\n')
+            f.write('  <trackList>\n')
+            for video_file in video_files:
+                f.write('    <track>\n')
+                f.write(f'      <location>file:///{video_file.replace("\\", "/")}</location>\n')
+                f.write('    </track>\n')
+            f.write('  </trackList>\n')
+            f.write('</playlist>\n')
+        print(f"XSPFプレイリストを生成しました: {xspf_path}")
+    except Exception as e:
+        print(f"XSPFプレイリストの生成に失敗しました: {e}")
+
+
 def increment_page_param(url: str) -> str | None:
     """URLのpageクエリを増加させる。pageパラメータがない場合は1を追加する（0スタート）。"""
     parsed = urllib.parse.urlparse(url)
@@ -342,6 +382,9 @@ if __name__ == '__main__':
 
         print(f'\n全URLから {len(all_video_urls)} 件の動画URLを収集しました。')
 
+        # ダウンロードしたファイルのリスト
+        downloaded_files = []
+
         # 収集したすべての動画をダウンロード
         for i, video_info in enumerate(all_video_urls, 1):
             video_url = video_info['url']
@@ -383,6 +426,7 @@ if __name__ == '__main__':
             try:
                 download_video(selected_source, output_path)
                 append_history(user_dir, video_url, selected_source, output_path)
+                downloaded_files.append(output_path)
             except Exception as e:
                 if overwrite_small_file:
                     fallback_path = get_unique_output_path(output_path)
@@ -390,6 +434,7 @@ if __name__ == '__main__':
                     try:
                         download_video(selected_source, fallback_path)
                         append_history(user_dir, video_url, selected_source, fallback_path)
+                        downloaded_files.append(fallback_path)
                     except Exception as e2:
                         print(f"動画 {video_url} のダウンロードをスキップします: {e2}")
                         append_failure_url(video_url)
@@ -403,5 +448,9 @@ if __name__ == '__main__':
             if i < len(all_video_urls):
                 print(f'次のダウンロードまで {DOWNLOAD_DELAY} 秒待機...')
                 time.sleep(DOWNLOAD_DELAY)
+
+        # プレイリストファイルを生成
+        if downloaded_files:
+            generate_playlist_files(BASE_OUTPUT_DIR, downloaded_files)
 
         print('\nすべてのダウンロードが完了しました。\n')
