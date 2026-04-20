@@ -104,8 +104,7 @@ def extract_page_info(video_url: str) -> tuple[str, str, list[str]]:
         username = 'unknown'
         profile_links = [
             a for a in driver.find_elements('tag name', 'a')
-            if a.get_attribute('href')
-            and '/profile/' in a.get_attribute('href')
+            if (href := a.get_attribute('href')) and '/profile/' in href
         ]
         for a in profile_links:
             text = a.text.strip()
@@ -270,161 +269,6 @@ def get_video_urls_from_list_page(list_url: str) -> list[str]:
 
 
 if __name__ == '__main__':
-    while True:
-        # TARGET_URLS_LIST_FILE_PATH からURLリストを読み込む
-        target_urls = []
-        if os.path.exists(TARGET_URLS_LIST_FILE_PATH):
-            try:
-                with open(TARGET_URLS_LIST_FILE_PATH, 'r', encoding='utf-8') as f:
-                    target_urls = [line.strip() for line in f if line.strip()]
-                # ファイルを空にする
-                with open(TARGET_URLS_LIST_FILE_PATH, 'w', encoding='utf-8') as f:
-                    f.write('')
-                print(f'{TARGET_URLS_LIST_FILE_PATH} から {len(target_urls)} 件のURLを読み込みました。')
-            except Exception as e:
-                print(f'URLリストファイルの読み込みに失敗しました: {e}')
-                target_urls = []
-
-        # URLリストがある場合はそれを使用、ない場合は手動入力
-        if target_urls:
-            url_list = target_urls
-        else:
-            url_list = []
-            while True:
-                list_url = input('iwara.aiのリストページURLを入力してください（終了するにはEnterのみ）: ').strip()
-                if not list_url:
-                    break
-                url_list.append(list_url)
-            
-            # 手動入力でURLが一つも入力されなかった場合はプログラム終了
-            if not url_list:
-                print('終了します。')
-                break
-
-        # すべてのURLから動画URLを収集
-        all_video_urls = []
-        for list_url in url_list:
-            if not list_url:
-                continue
-
-            print(f'\n=== URL処理開始: {list_url} ===')
-
-            # URLに基づいて定数を設定
-            parsed = urllib.parse.urlparse(list_url)
-            domain = parsed.netloc
-            if 'iwara.ai' in domain:
-                BASE_OUTPUT_DIR = r"R:\iwara.ai"
-                COMPARE_BASE_URL = 'https://www.iwara.ai/video/'
-            elif 'iwara.tv' in domain:
-                BASE_OUTPUT_DIR = r"R:\iwara.tv"
-                COMPARE_BASE_URL = 'https://www.iwara.tv/video/'
-            else:
-                print("サポートされていないドメインです。スキップします。")
-                continue
-
-            os.makedirs(BASE_OUTPUT_DIR, exist_ok=True)
-
-            # list_url が動画ページのURLの場合、直接そのURLを使用
-            if list_url.startswith(COMPARE_BASE_URL) and list_url != COMPARE_BASE_URL:
-                video_urls = [list_url]
-                print(f'動画ページのURLが指定されました: {list_url}')
-            else:
-                video_urls = get_video_urls_from_list_page(list_url)
-                print(f'見つかった動画URL: {len(video_urls)} 件')
-
-            # 動画URLにメタデータを付与して保存
-            for video_url in video_urls:
-                all_video_urls.append({
-                    'url': video_url,
-                    'base_output_dir': BASE_OUTPUT_DIR,
-                    'compare_base_url': COMPARE_BASE_URL
-                })
-
-            print(f'=== URL処理完了: {list_url} ===\n')
-
-        print(f'\n全URLから {len(all_video_urls)} 件の動画URLを収集しました。')
-
-        # ダウンロードしたファイルのリスト
-        downloaded_files = []
-
-        # プレイリストファイルを最初に1回だけ初期化
-        mpcpl_path, xspf_path = init_playlist_files(BASE_OUTPUT_DIR)
-
-        # 収集したすべての動画をダウンロード
-        for i, video_info in enumerate(all_video_urls, 1):
-            video_url = video_info['url']
-            BASE_OUTPUT_DIR = video_info['base_output_dir']
-            COMPARE_BASE_URL = video_info['compare_base_url']
-
-            print(f'\n--- 動画 {i}/{len(all_video_urls)}: {video_url} ---')
-
-            username, title, sources = extract_page_info(video_url)
-            print(f'username={username}, title={title}, sources={sources}')
-
-            # ページ情報取得に失敗した場合
-            if username == 'unknown' and title == 'unknown' and not sources:
-                print('ページ情報の取得に失敗しました。スキップします。')
-                append_failure_url(video_url)
-                continue
-
-            selected_source = select_largest_source(sources)
-            if not selected_source:
-                print('動画ソースが見つかりませんでした。スキップします。')
-                append_failure_url(video_url)
-                continue
-            original_filename, ext = get_source_filename(selected_source)
-            video_id = extract_video_id(video_url)
-            output_filename = f"{sanitize_filename(username)}_{sanitize_filename(video_id)}_{sanitize_filename(title)}.{ext}"
-            user_dir = os.path.join(BASE_OUTPUT_DIR, sanitize_filename(username))
-            os.makedirs(user_dir, exist_ok=True)
-            output_path = os.path.join(user_dir, output_filename)
-
-            overwrite_small_file = False
-            if os.path.exists(output_path):
-                existing_size = os.path.getsize(output_path)
-                if existing_size > 1024:
-                    print(f"ファイルが既に存在します: {output_path}。サイズが1KBを超えるためスキップします。")
-                    continue
-                print(f"ファイルが既に存在します: {output_path}。サイズが1KB以下なので上書きします。")
-                overwrite_small_file = True
-
-            try:
-                download_video(selected_source, output_path)
-                append_history(user_dir, video_url, selected_source, output_path)
-                downloaded_files.append(output_path)
-                # プレイリストに今すぐ追記
-                append_playlist_entry(mpcpl_path, xspf_path, output_path)
-            except Exception as e:
-                if overwrite_small_file:
-                    fallback_path = get_unique_output_path(output_path)
-                    print(f"上書きに失敗したため、代わりに {fallback_path} を使用します。")
-                    try:
-                        download_video(selected_source, fallback_path)
-                        append_history(user_dir, video_url, selected_source, fallback_path)
-                        downloaded_files.append(fallback_path)
-                        # プレイリストに今すぐ追記
-                        append_playlist_entry(mpcpl_path, xspf_path, fallback_path)
-                    except Exception as e2:
-                        print(f"動画 {video_url} のダウンロードをスキップします: {e2}")
-                        append_failure_url(video_url)
-                        continue
-                else:
-                    print(f"動画 {video_url} のダウンロードをスキップします: {e}")
-                    append_failure_url(video_url)
-                    continue
-
-            # ダウンロード間隔を開ける（最後の動画以外）
-            if i < len(all_video_urls):
-                print(f'次のダウンロードまで {DOWNLOAD_DELAY} 秒待機...')
-                time.sleep(DOWNLOAD_DELAY)
-
-        # XSPFプレイリストファイルを完成させる
-        finalize_playlist(xspf_path)
-
-        print('\nすべてのダウンロードが完了しました。\n')
-
-
-if __name__ == '__main__':
     import sys
 
     # コマンドライン引数の処理
@@ -438,3 +282,158 @@ if __name__ == '__main__':
     else:
         # 通常のダウンロードモード
         while True:
+            # TARGET_URLS_LIST_FILE_PATH からURLリストを読み込む
+            target_urls = []
+            if os.path.exists(TARGET_URLS_LIST_FILE_PATH):
+                try:
+                    with open(TARGET_URLS_LIST_FILE_PATH, 'r', encoding='utf-8') as f:
+                        target_urls = [line.strip() for line in f if line.strip()]
+                    # ファイルを空にする
+                    with open(TARGET_URLS_LIST_FILE_PATH, 'w', encoding='utf-8') as f:
+                        f.write('')
+                    print(f'{TARGET_URLS_LIST_FILE_PATH} から {len(target_urls)} 件のURLを読み込みました。')
+                except Exception as e:
+                    print(f'URLリストファイルの読み込みに失敗しました: {e}')
+                    target_urls = []
+
+            # URLリストがある場合はそれを使用、ない場合は手動入力
+            if target_urls:
+                url_list = target_urls
+            else:
+                url_list = []
+                while True:
+                    list_url = input('iwara.aiのリストページURLを入力してください（終了するにはEnterのみ）: ').strip()
+                    if not list_url:
+                        break
+                    url_list.append(list_url)
+                
+                # 手動入力でURLが一つも入力されなかった場合はプログラム終了
+                if not url_list:
+                    print('終了します。')
+                    break
+
+            # すべてのURLから動画URLを収集
+            all_video_urls = []
+            for list_url in url_list:
+                if not list_url:
+                    continue
+
+                print(f'\n=== URL処理開始: {list_url} ===')
+
+                # URLに基づいて定数を設定
+                parsed = urllib.parse.urlparse(list_url)
+                domain = parsed.netloc
+                if 'iwara.ai' in domain:
+                    BASE_OUTPUT_DIR = r"R:\iwara.ai"
+                    COMPARE_BASE_URL = 'https://www.iwara.ai/video/'
+                elif 'iwara.tv' in domain:
+                    BASE_OUTPUT_DIR = r"R:\iwara.tv"
+                    COMPARE_BASE_URL = 'https://www.iwara.tv/video/'
+                else:
+                    print("サポートされていないドメインです。スキップします。")
+                    continue
+
+                os.makedirs(BASE_OUTPUT_DIR, exist_ok=True)
+
+                # list_url が動画ページのURLの場合、直接そのURLを使用
+                if list_url.startswith(COMPARE_BASE_URL) and list_url != COMPARE_BASE_URL:
+                    video_urls = [list_url]
+                    print(f'動画ページのURLが指定されました: {list_url}')
+                else:
+                    video_urls = get_video_urls_from_list_page(list_url)
+                    print(f'見つかった動画URL: {len(video_urls)} 件')
+
+                # 動画URLにメタデータを付与して保存
+                for video_url in video_urls:
+                    all_video_urls.append({
+                        'url': video_url,
+                        'base_output_dir': BASE_OUTPUT_DIR,
+                        'compare_base_url': COMPARE_BASE_URL
+                    })
+
+                print(f'=== URL処理完了: {list_url} ===\n')
+
+            print(f'\n全URLから {len(all_video_urls)} 件の動画URLを収集しました。')
+
+            # ダウンロードしたファイルのリスト
+            downloaded_files = []
+
+            # プレイリストファイルを初期化
+            mpcpl_path = None
+            xspf_path = None
+
+            # 収集したすべての動画をダウンロード
+            for i, video_info in enumerate(all_video_urls, 1):
+                video_url = video_info['url']
+                BASE_OUTPUT_DIR = video_info['base_output_dir']
+                COMPARE_BASE_URL = video_info['compare_base_url']
+
+                # プレイリストファイルをループ内で初期化
+                mpcpl_path, xspf_path = init_playlist_files(BASE_OUTPUT_DIR)
+
+                print(f'\n--- 動画 {i}/{len(all_video_urls)}: {video_url} ---')
+
+                username, title, sources = extract_page_info(video_url)
+                print(f'username={username}, title={title}, sources={sources}')
+
+                # ページ情報取得に失敗した場合
+                if username == 'unknown' and title == 'unknown' and not sources:
+                    print('ページ情報の取得に失敗しました。スキップします。')
+                    append_failure_url(video_url)
+                    continue
+
+                selected_source = select_largest_source(sources)
+                if not selected_source:
+                    print('動画ソースが見つかりませんでした。スキップします。')
+                    append_failure_url(video_url)
+                    continue
+                original_filename, ext = get_source_filename(selected_source)
+                video_id = extract_video_id(video_url)
+                output_filename = f"{sanitize_filename(username)}_{sanitize_filename(video_id)}_{sanitize_filename(title)}.{ext}"
+                user_dir = os.path.join(BASE_OUTPUT_DIR, sanitize_filename(username))
+                os.makedirs(user_dir, exist_ok=True)
+                output_path = os.path.join(user_dir, output_filename)
+
+                overwrite_small_file = False
+                if os.path.exists(output_path):
+                    existing_size = os.path.getsize(output_path)
+                    if existing_size > 1024:
+                        print(f"ファイルが既に存在します: {output_path}。サイズが1KBを超えるためスキップします。")
+                        continue
+                    print(f"ファイルが既に存在します: {output_path}。サイズが1KB以下なので上書きします。")
+                    overwrite_small_file = True
+
+                try:
+                    download_video(selected_source, output_path)
+                    append_history(user_dir, video_url, selected_source, output_path)
+                    downloaded_files.append(output_path)
+                    # プレイリストに今すぐ追記
+                    append_playlist_entry(mpcpl_path, xspf_path, output_path)
+                except Exception as e:
+                    if overwrite_small_file:
+                        fallback_path = get_unique_output_path(output_path)
+                        print(f"上書きに失敗したため、代わりに {fallback_path} を使用します。")
+                        try:
+                            download_video(selected_source, fallback_path)
+                            append_history(user_dir, video_url, selected_source, fallback_path)
+                            downloaded_files.append(fallback_path)
+                            # プレイリストに今すぐ追記
+                            append_playlist_entry(mpcpl_path, xspf_path, fallback_path)
+                        except Exception as e2:
+                            print(f"動画 {video_url} のダウンロードをスキップします: {e2}")
+                            append_failure_url(video_url)
+                            continue
+                    else:
+                        print(f"動画 {video_url} のダウンロードをスキップします: {e}")
+                        append_failure_url(video_url)
+                        continue
+
+                # ダウンロード間隔を開ける（最後の動画以外）
+                if i < len(all_video_urls):
+                    print(f'次のダウンロードまで {DOWNLOAD_DELAY} 秒待機...')
+                    time.sleep(DOWNLOAD_DELAY)
+
+            # XSPFプレイリストファイルを完成させる
+            finalize_playlist(xspf_path)
+
+            print('\nすべてのダウンロードが完了しました。\n')
