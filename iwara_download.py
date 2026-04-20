@@ -357,18 +357,14 @@ if __name__ == '__main__':
             # ダウンロードしたファイルのリスト
             downloaded_files = []
 
-            # プレイリストファイルを初期化
-            mpcpl_path = None
-            xspf_path = None
+            # プレイリストファイルを初期化（ループ内で1回だけ）
+            mpcpl_path, xspf_path = init_playlist_files(BASE_OUTPUT_DIR)
 
             # 収集したすべての動画をダウンロード
             for i, video_info in enumerate(all_video_urls, 1):
                 video_url = video_info['url']
                 BASE_OUTPUT_DIR = video_info['base_output_dir']
                 COMPARE_BASE_URL = video_info['compare_base_url']
-
-                # プレイリストファイルをループ内で初期化
-                mpcpl_path, xspf_path = init_playlist_files(BASE_OUTPUT_DIR)
 
                 print(f'\n--- 動画 {i}/{len(all_video_urls)}: {video_url} ---')
 
