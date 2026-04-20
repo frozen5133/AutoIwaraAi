@@ -393,8 +393,8 @@ if __name__ == '__main__':
                 if os.path.exists(output_path):
                     existing_size = os.path.getsize(output_path)
                     if existing_size > 1024:
-                        print(f"ファイルが既に存在します: {output_path}。サイズが1KBを超えるためスキップします。")
-                        continue
+                        print(f"ファイルが既に存在します: {output_path}。サイズが1KBを超えるため処理を終了します。")
+                        break
                     print(f"ファイルが既に存在します: {output_path}。サイズが1KB以下なので上書きします。")
                     overwrite_small_file = True
 
