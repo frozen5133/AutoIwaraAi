@@ -434,6 +434,7 @@ if __name__ == '__main__':
                     time.sleep(DOWNLOAD_DELAY)
 
             # XSPFプレイリストファイルを完成させる
-            finalize_playlist(xspf_path)
+            if xspf_path:
+                finalize_playlist(xspf_path)
 
             print('\nすべてのダウンロードが完了しました。\n')
