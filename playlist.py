@@ -179,10 +179,9 @@ def generate_playlist_from_history(history_path: str, output_dir: str, min_files
         if len(current_videos) >= min_files or i == len(sorted_dates) - 1:
             if current_videos:
                 playlist_count += 1
-                timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
                 # 3桁ゼロ埋めファイル数を追加
                 file_count = len(current_videos)
-                base_name = f"history_{date}_{file_count:03d}_{timestamp}"
+                base_name = f"history_{date}_{file_count:03d}"
 
                 # MPCPL形式
                 mpcpl_path = os.path.join(output_dir, f"{base_name}.mpcpl")
