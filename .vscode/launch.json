@@ -6,6 +6,20 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: プレイリスト生成（履歴から）",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/iwara_download.py",
+            "args": [
+                "--playlist-from-history",
+                "R:\\iwara.ai\\download_history.txt",
+                "--min-files",
+                "30"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

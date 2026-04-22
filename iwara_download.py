@@ -271,13 +271,25 @@ if __name__ == '__main__':
     import sys
 
     # コマンドライン引数の処理
-    # 例: python iwara_download.py --playlist-from-history R:\iwara.ai\download_history.txt
+    # 例: python iwara_download.py --playlist-from-history R:\iwara.ai\download_history.txt [--max-files 20]
     if len(sys.argv) >= 3 and sys.argv[1] == '--playlist-from-history':
         history_path = sys.argv[2]
         # 履歴ファイルと同じディレクトリに出力
         output_dir = os.path.dirname(history_path) or '.'
+        
+        # min-files 引数の処理
+        min_files = 30  # デフォルト値
+        if '--min-files' in sys.argv:
+            idx = sys.argv.index('--min-files')
+            if idx + 1 < len(sys.argv):
+                try:
+                    min_files = int(sys.argv[idx + 1])
+                except ValueError:
+                    print(f"無効なmin-files値: {sys.argv[idx + 1]}、デフォルト値30を使用")
+        
         print(f"履歴ファイルからプレイリストを生成します: {history_path}")
-        generate_playlist_from_history(history_path, output_dir)
+        print(f"1プレイリストあたりの最低ファイル数: {min_files}")
+        generate_playlist_from_history(history_path, output_dir, min_files)
     else:
         # 通常のダウンロードモード
         while True:
