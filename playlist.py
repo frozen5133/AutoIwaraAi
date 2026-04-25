@@ -79,7 +79,7 @@ def append_playlist_entry(mpcpl_path: str, xspf_path: str, video_file: str) -> N
             encoded_path = urllib.parse.quote(uri_path, safe='/')
             with open(xspf_path, 'a', encoding='utf-8') as f:
                 f.write('    <track>\n')
-                f.write(f'      <location>file:{encoded_path}</location>\n')
+                f.write(f'      <location>smb:{encoded_path}</location>\n')
                 f.write('    </track>\n')
         except Exception as e:
             print(f"XSPFプレイリストへの追記に失敗しました: {e}")
@@ -212,7 +212,7 @@ def generate_playlist_from_history(history_path: str, output_dir: str, min_files
                             uri_path = network_path.replace('\\', '/')
                             encoded_path = urllib.parse.quote(uri_path, safe='/')
                             f.write('    <track>\n')
-                            f.write(f'      <location>file:{encoded_path}</location>\n')
+                            f.write(f'      <location>smb:{encoded_path}</location>\n')
                             f.write('    </track>\n')
                         # 逐次的に閉じタグを出力（中断してもその時点までのファイルが有効）
                         f.write('  </trackList>\n')
@@ -292,15 +292,20 @@ def generate_playlist_by_file_count(base_output_dir: str = "R:\\iwara.ai", min_c
     min_name = 'any' if min_count is None else str(min_count)
     max_name = 'any' if max_count is None else str(max_count)
     
+    # ファイル名のプレフィックス
+    if min_count is None and max_count is None:
+        playlist_prefix = 'plfhbcnl'
+    else:
+        playlist_prefix = f"{datetime.now().strftime('%Y%m%d%H%M%S')}-{min_name}-{max_name}"
+    
     # ファイル数ごとにプレイリストを生成
     playlist_count = 0
-    base_name = datetime.now().strftime('%Y%m%d%H%M%S')
 
     for file_count in sorted(matching_folders):
         folders = matching_folders[file_count]
         playlist_count += 1
 
-        mpcpl_path = os.path.join(base_output_dir, f"{base_name}-{min_name}-{max_name}-{file_count:03d}.mpcpl")
+        mpcpl_path = os.path.join(base_output_dir, f"{playlist_prefix}-{file_count:03d}.mpcpl")
         try:
             with open(mpcpl_path, 'w', encoding='utf-8') as f:
                 f.write("MPCPLAYLIST\n")
@@ -315,7 +320,7 @@ def generate_playlist_by_file_count(base_output_dir: str = "R:\\iwara.ai", min_c
         except Exception as e:
             print(f"MPCPLプレイリストの生成に失敗しました: {e}")
 
-        xspf_path = os.path.join(base_output_dir, f"{base_name}-{min_count}-{max_count}-{file_count:03d}.xspf")
+        xspf_path = os.path.join(base_output_dir, f"{playlist_prefix}-{file_count:03d}.xspf")
         try:
             with open(xspf_path, 'w', encoding='utf-8') as f:
                 f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
@@ -329,7 +334,7 @@ def generate_playlist_by_file_count(base_output_dir: str = "R:\\iwara.ai", min_c
                         uri_path = network_path.replace('\\', '/')
                         encoded_path = urllib.parse.quote(uri_path, safe='/')
                         f.write('    <track>\n')
-                        f.write(f'      <location>file:{encoded_path}</location>\n')
+                        f.write(f'      <location>smb:{encoded_path}</location>\n')
                         f.write('    </track>\n')
                 f.write('  </trackList>\n')
                 f.write('</playlist>\n')
