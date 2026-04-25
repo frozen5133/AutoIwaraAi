@@ -56,6 +56,8 @@ def append_playlist_entry(mpcpl_path: str, xspf_path: str, video_file: str) -> N
     """プレイリストファイルに1件ずつ追記する"""
     # 絶対パスに変換
     abs_path = os.path.abspath(video_file)
+    # R: をネットワークパスに変換
+    network_path = convert_to_network_path(abs_path)
 
     # MPCPL形式
     if mpcpl_path:
@@ -68,14 +70,14 @@ def append_playlist_entry(mpcpl_path: str, xspf_path: str, video_file: str) -> N
                         entry_count += 1
             entry_count += 1
             with open(mpcpl_path, 'a', encoding='utf-8') as f:
-                f.write(f"{entry_count},type,0\n{entry_count},filename,{abs_path}\n")
+                f.write(f"{entry_count},type,0\n{entry_count},filename,{network_path}\n")
         except Exception as e:
             print(f"MPCPLプレイリストへの追記に失敗しました: {e}")
 
     # XSPF形式
     if xspf_path:
         try:
-            uri_path = abs_path.replace('\\', '/')
+            uri_path = network_path.replace('\\', '/')
             encoded_path = urllib.parse.quote(uri_path, safe='/')
             with open(xspf_path, 'a', encoding='utf-8') as f:
                 f.write('    <track>\n')
