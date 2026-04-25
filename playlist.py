@@ -226,3 +226,126 @@ def generate_playlist_from_history(history_path: str, output_dir: str, min_files
                 current_videos = []
 
     print(f"合計 {playlist_count} 個のプレイリストを生成しました。")
+
+
+def generate_playlist_by_file_count(base_output_dir: str = "R:\\iwara.ai", min_count: int | None = None, max_count: int | None = None) -> None:
+    """サブフォルダ内の動画ファイル数が指定範囲内のプレイリストを生成する
+    
+    Args:
+        base_output_dir: ベース出力ディレクトリ（デフォルト: R:\\iwara.ai）
+        min_count: 動画ファイル数の最小値。省略すると制限なし。
+        max_count: 動画ファイル数の最大値。省略すると制限なし。
+    """
+    if not os.path.exists(base_output_dir):
+        print(f"ディレクトリが存在しません: {base_output_dir}")
+        return
+
+    # 動画ファイルの拡張子
+    VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.webm', '.avi', '.mov', '.wmv', '.flv', '.m4v'}
+    
+    # サブフォルダをスキャン
+    subfolders = [d for d in os.listdir(base_output_dir) if os.path.isdir(os.path.join(base_output_dir, d))]
+    
+    if not subfolders:
+        print("サブフォルダが見つかりませんでした。")
+        return
+    
+    min_label = str(min_count) if min_count is not None else 'なし'
+    max_label = str(max_count) if max_count is not None else 'なし'
+    print(f"ベースディレクトリ: {base_output_dir}")
+    print(f"検索範囲: {min_label} ～ {max_label} ファイル")
+    print(f"サブフォルダ数: {len(subfolders)}")
+    
+    # 条件に一致するサブフォルダを収集 (ファイル数ごとにグループ化)
+    matching_folders: dict[int, list[tuple[str, list[str]]]] = {}  # file_count -> [(folder_name, [video_files]), ...]
+    
+    for subfolder in subfolders:
+        subfolder_path = os.path.join(base_output_dir, subfolder)
+        
+        # 動画ファイルを収集
+        video_files = []
+        try:
+            for file in os.listdir(subfolder_path):
+                ext = os.path.splitext(file)[1].lower()
+                if ext in VIDEO_EXTENSIONS:
+                    video_files.append(os.path.join(subfolder_path, file))
+        except Exception as e:
+            print(f"フォルダの読み込みに失敗しました: {subfolder_path} - {e}")
+            continue
+        
+        file_count = len(video_files)
+        
+        if (min_count is None or file_count >= min_count) and (max_count is None or file_count <= max_count):
+            matching_folders.setdefault(file_count, []).append((subfolder, video_files))
+            print(f"  ✓ {subfolder}: {file_count} ファイル")
+        else:
+            print(f"    {subfolder}: {file_count} ファイル（範囲外）")
+    
+    if not matching_folders:
+        print(f"\n{min_label}～{max_label}ファイルのフォルダが見つかりませんでした。")
+        return
+    
+    total_folders = sum(len(v) for v in matching_folders.values())
+    print(f"\n条件に一致するフォルダ: {total_folders} 件 ({len(matching_folders)} 種類のファイル数)")
+    
+    # プレイリスト識別用ラベル
+    min_name = 'any' if min_count is None else str(min_count)
+    max_name = 'any' if max_count is None else str(max_count)
+    
+    # ファイル数ごとにプレイリストを生成
+    playlist_count = 0
+    base_name = datetime.now().strftime('%Y%m%d%H%M%S')
+
+    for file_count in sorted(matching_folders):
+        folders = matching_folders[file_count]
+        playlist_count += 1
+
+        mpcpl_path = os.path.join(base_output_dir, f"{base_name}-{min_name}-{max_name}-{file_count:03d}.mpcpl")
+        try:
+            with open(mpcpl_path, 'w', encoding='utf-8') as f:
+                f.write("MPCPLAYLIST\n")
+                k = 0
+                for folder_name, video_files in sorted(folders, key=lambda item: item[0]):
+                    for video_file in sorted(video_files):
+                        abs_path = os.path.abspath(video_file)
+                        network_path = convert_to_network_path(abs_path)
+                        k += 1
+                        f.write(f"{k},type,0\n{k},filename,{network_path}\n")
+            print(f"MPCPLプレイリストを生成: {mpcpl_path} ({k} ファイル, ファイル数={file_count})")
+        except Exception as e:
+            print(f"MPCPLプレイリストの生成に失敗しました: {e}")
+
+        xspf_path = os.path.join(base_output_dir, f"{base_name}-{min_count}-{max_count}-{file_count:03d}.xspf")
+        try:
+            with open(xspf_path, 'w', encoding='utf-8') as f:
+                f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+                f.write('<playlist version="1" xmlns="http://xspf.org/ns/0/">\n')
+                f.write(f'  <title>{file_count} files ({len(folders)} folders)</title>\n')
+                f.write('  <trackList>\n')
+                for folder_name, video_files in sorted(folders, key=lambda item: item[0]):
+                    for video_file in sorted(video_files):
+                        abs_path = os.path.abspath(video_file)
+                        network_path = convert_to_network_path(abs_path)
+                        uri_path = network_path.replace('\\', '/')
+                        encoded_path = urllib.parse.quote(uri_path, safe='/')
+                        f.write('    <track>\n')
+                        f.write(f'      <location>file:{encoded_path}</location>\n')
+                        f.write('    </track>\n')
+                f.write('  </trackList>\n')
+                f.write('</playlist>\n')
+            print(f"XSPFプレイリストを生成: {xspf_path}")
+        except Exception as e:
+            print(f"XSPFプレイリストの生成に失敗しました: {e}")
+
+    print(f"\n合計 {playlist_count} 個のプレイリストを生成しました。")
+
+
+def sanitize_filename(name: str) -> str:
+    """ファイル名に使えない文字を置換する"""
+    if not name:
+        return 'unknown'
+    import re
+    name = name.strip()
+    name = re.sub(r'[\/:*?"<>|]', '_', name)
+    name = re.sub(r'\s+', ' ', name)
+    return name

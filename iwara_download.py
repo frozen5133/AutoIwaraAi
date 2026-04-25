@@ -8,7 +8,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 import time
-from playlist import init_playlist_files, append_playlist_entry, finalize_playlist, generate_playlist_from_history
+from playlist import init_playlist_files, append_playlist_entry, finalize_playlist, generate_playlist_from_history, generate_playlist_by_file_count
 
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 DOWNLOAD_DELAY = 10  # ダウンロード間隔（秒）
@@ -290,6 +290,18 @@ if __name__ == '__main__':
         print(f"履歴ファイルからプレイリストを生成します: {history_path}")
         print(f"1プレイリストあたりの最低ファイル数: {min_files}")
         generate_playlist_from_history(history_path, output_dir, min_files)
+    elif len(sys.argv) >= 2 and sys.argv[1] == '--playlist-by-count':
+        # 例: python iwara_download.py --playlist-by-count R:\iwara.ai
+        # 例: python iwara_download.py --playlist-by-count R:\iwara.ai 1
+        # 例: python iwara_download.py --playlist-by-count R:\iwara.ai 1 30
+        base_dir = sys.argv[2] if len(sys.argv) > 2 else r"R:\iwara.ai"
+        min_count = int(sys.argv[3]) if len(sys.argv) > 3 else None
+        max_count = int(sys.argv[4]) if len(sys.argv) > 4 else None
+        min_label = str(min_count) if min_count is not None else 'なし'
+        max_label = str(max_count) if max_count is not None else 'なし'
+        print(f"サブフォルダ内の動画ファイル数が {min_label}～{max_label} のプレイリストを生成します")
+        print(f"ベースディレクトリ: {base_dir}")
+        generate_playlist_by_file_count(base_dir, min_count, max_count)
     else:
         # 通常のダウンロードモード
         while True:

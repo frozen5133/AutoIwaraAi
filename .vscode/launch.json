@@ -4,8 +4,9 @@
             "name": "Python デバッガー: 現在のファイル",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal"
+            "program": "${workspaceFolder}/iwara_download.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
         },
         {
             "name": "Python: プレイリスト生成（履歴から）",
@@ -17,6 +18,32 @@
                 "R:\\iwara.ai\\download_history.txt",
                 "--min-files",
                 "30"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Python: プレイリスト生成（ファイル数で）",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/iwara_download.py",
+            "args": [
+                "--playlist-by-count",
+                "R:\\iwara.ai",
+                "20",
+                "200"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Python: プレイリスト生成（ファイル数で）無制限",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/iwara_download.py",
+            "args": [
+                "--playlist-by-count",
+                "R:\\iwara.ai"
             ],
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}"
